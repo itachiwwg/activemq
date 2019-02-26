@@ -101,7 +101,7 @@ import org.apache.activemq.network.jms.JmsConnector;
 import org.apache.activemq.openwire.OpenWireFormat;
 import org.apache.activemq.proxy.ProxyConnector;
 import org.apache.activemq.security.MessageAuthorizationPolicy;
-import org.apache.activemq.selector.SelectorParser;
+//import org.apache.activemq.selector.SelectorParser;
 import org.apache.activemq.store.JournaledStore;
 import org.apache.activemq.store.PListStore;
 import org.apache.activemq.store.PersistenceAdapter;
@@ -873,7 +873,7 @@ public class BrokerService implements Service {
                 managementContext = null;
             }
             // Clear SelectorParser cache to free memory
-            SelectorParser.clearCache();
+            //SelectorParser.clearCache();
         } finally {
             started.set(false);
             stopped.set(true);
