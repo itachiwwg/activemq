@@ -55,6 +55,10 @@ public class QueueSubscription extends PrefetchSubscription implements LockOwner
         queue.removeMessage(context, this, node, ack);
     }
 
+
+    /*
+    * 检查该消息是否可以分发；
+    * */
     @Override
     protected boolean canDispatch(MessageReference n) throws IOException {
         boolean result = true;
