@@ -16,50 +16,11 @@
  */
 package org.apache.activemq.broker.region;
 
-import static org.apache.activemq.broker.region.cursors.AbstractStoreCursor.gotToTheStore;
-import static org.apache.activemq.transaction.Transaction.IN_USE_STATE;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.DelayQueue;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import javax.jms.InvalidSelectorException;
-import javax.jms.JMSException;
-import javax.jms.ResourceAllocationException;
-
 import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.broker.BrokerStoppedException;
 import org.apache.activemq.broker.ConnectionContext;
 import org.apache.activemq.broker.ProducerBrokerExchange;
-import org.apache.activemq.broker.region.cursors.OrderedPendingList;
-import org.apache.activemq.broker.region.cursors.PendingList;
-import org.apache.activemq.broker.region.cursors.PendingMessageCursor;
-import org.apache.activemq.broker.region.cursors.PrioritizedPendingList;
-import org.apache.activemq.broker.region.cursors.QueueDispatchPendingList;
-import org.apache.activemq.broker.region.cursors.StoreQueueCursor;
-import org.apache.activemq.broker.region.cursors.VMPendingMessageCursor;
+import org.apache.activemq.broker.region.cursors.*;
 import org.apache.activemq.broker.region.group.CachedMessageGroupMapFactory;
 import org.apache.activemq.broker.region.group.MessageGroupMap;
 import org.apache.activemq.broker.region.group.MessageGroupMapFactory;
@@ -67,21 +28,9 @@ import org.apache.activemq.broker.region.policy.DeadLetterStrategy;
 import org.apache.activemq.broker.region.policy.DispatchPolicy;
 import org.apache.activemq.broker.region.policy.RoundRobinDispatchPolicy;
 import org.apache.activemq.broker.util.InsertionCountList;
-import org.apache.activemq.command.ActiveMQDestination;
-import org.apache.activemq.command.ConsumerId;
-import org.apache.activemq.command.ExceptionResponse;
-import org.apache.activemq.command.Message;
-import org.apache.activemq.command.MessageAck;
-import org.apache.activemq.command.MessageDispatchNotification;
-import org.apache.activemq.command.MessageId;
-import org.apache.activemq.command.ProducerAck;
-import org.apache.activemq.command.ProducerInfo;
-import org.apache.activemq.command.RemoveInfo;
-import org.apache.activemq.command.Response;
-import org.apache.activemq.filter.BooleanExpression;
+import org.apache.activemq.command.*;
 import org.apache.activemq.filter.MessageEvaluationContext;
 import org.apache.activemq.filter.NonCachedMessageEvaluationContext;
-//import org.apache.activemq.selector.SelectorParser;
 import org.apache.activemq.state.ProducerState;
 import org.apache.activemq.store.IndexListener;
 import org.apache.activemq.store.ListenableFuture;
@@ -99,9 +48,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import javax.jms.InvalidSelectorException;
+import javax.jms.JMSException;
+import javax.jms.ResourceAllocationException;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import static org.apache.activemq.broker.region.cursors.AbstractStoreCursor.gotToTheStore;
+import static org.apache.activemq.transaction.Transaction.IN_USE_STATE;
+
+//import org.apache.activemq.selector.SelectorParser;
+
 /**
  * The Queue is a List of MessageEntry objects that are dispatched to matching
  * subscriptions.
+ *
+ * 从PendingMessageCursor 中加载 MAX_PAGE_SIZE(200)条消息到dispathList,然后发送给客户端；
  */
 public class Queue extends BaseDestination implements Task, UsageListener, IndexListener {
     protected static final Logger LOG = LoggerFactory.getLogger(Queue.class);
@@ -1962,7 +1930,7 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
     private void doPageIn(boolean force) throws Exception {
         doPageIn(force, true, getMaxPageSize());
     }
-
+    // 从
     private void doPageIn(boolean force, boolean processExpired, int maxPageSize) throws Exception {
         PendingList newlyPaged = doPageInForDispatch(force, processExpired, maxPageSize);
         pagedInPendingDispatchLock.writeLock().lock();
