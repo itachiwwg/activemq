@@ -40,6 +40,8 @@ public class MessageAck extends BaseCommand {
 
     /**
      * The standard ack case where a client wants the message to be discarded.
+     *
+     * 标准ACK，当客户端需要该条消息不再使用时，发送该ACK；
      */
     public static final byte STANDARD_ACK_TYPE = 2;
 
@@ -47,6 +49,10 @@ public class MessageAck extends BaseCommand {
      * In case the client want's to explicitly let the broker know that a
      * message was not processed and the message was considered a poison
      * message.
+     *
+     * 当客户端需要让BROKER知道某条消息没有被处理并且该消息被认为是毒药；
+     * 达到最大投递次数后，发送此ACK；
+     *
      */
     public static final byte POSION_ACK_TYPE = 1;
 
