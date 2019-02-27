@@ -16,27 +16,26 @@
  */
 package org.apache.activemq.broker.region.cursors;
 
-import java.io.IOException;
-
 import org.apache.activemq.broker.Broker;
-import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.broker.region.Queue;
 import org.apache.activemq.command.Message;
 import org.apache.activemq.command.MessageId;
 import org.apache.activemq.store.MessageStore;
-import org.apache.activemq.store.memory.MemoryMessageStore;
-import org.apache.activemq.store.memory.MemoryTransactionStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 /**
  * persist pending messages pending message (messages awaiting dispatch to a
  * consumer) cursor
  *
- *
+ * 持久化积压消息游标；
  */
 class QueueStorePrefetch extends AbstractStoreCursor {
     private static final Logger LOG = LoggerFactory.getLogger(QueueStorePrefetch.class);
+
+    // 本类的操作对象，只可使用不可修改；
     private final MessageStore store;
     private final Queue queue;
     private final Broker broker;
