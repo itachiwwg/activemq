@@ -58,6 +58,8 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
     protected final List<MessageReference> dispatched = new ArrayList<MessageReference>();
     private int maxProducersToAudit=32;
     private int maxAuditDepth=2048;
+
+    // 以下参数为全局参数，只可用不可改；
     protected final SystemUsage usageManager;
     protected final Object pendingLock = new Object();
     protected final Object dispatchLock = new Object();
@@ -101,8 +103,9 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                 // If there was nothing dispatched.. we may need to setup a timeout.
                 if (dispatchCounterBeforePull == getSubscriptionStatistics().getDispatched().getCount() || pull.isAlwaysSignalDone()) {
                     // immediate timeout used by receiveNoWait()
+                    // 如果 pull 命令结束或者没有数据可发送，则发送 -1 ；
                     if (pull.getTimeout() == -1) {
-                        // Null message indicates the pull is done or did not have pending.
+                        // Null message indicates the pull is done or did not have pending
                         prefetchExtension.set(1);
                         add(QueueMessageReference.NULL_MESSAGE);
                         dispatchPending();
@@ -124,6 +127,9 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
     /**
      * Occurs when a pull times out. If nothing has been dispatched since the
      * timeout was setup, then send the NULL message.
+     *
+     * 当一个 pull 命令超时，从开始计时开始，如果没有发送任何东西，那么发送一个NULL；
+     *
      */
     final void pullTimeout(long dispatchCounterBeforePull, boolean alwaysSignalDone) {
         synchronized (pendingLock) {
@@ -190,6 +196,10 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                         + mdn.getConsumerId() + " on " + mdn.getDestination().getPhysicalName());
     }
 
+
+    /*
+    * 处理客户端发送来的ack应答
+    * */
     @Override
     public final void acknowledge(final ConnectionContext context,final MessageAck ack) throws Exception {
         // Handle the standard acknowledgment case.
@@ -205,21 +215,29 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
         LOG.trace("ack: {}", ack);
 
         synchronized(dispatchLock) {
+            // 如果是标准ACK；
             if (ack.isStandardAck()) {
                 // First check if the ack matches the dispatched. When using failover this might
                 // not be the case. We don't ever want to ack the wrong messages.
+                // 检查ack消息是不是期望中的消息的ACK.
                 assertAckMatchesDispatched(ack);
 
                 // Acknowledge all dispatched messages up till the message id of
                 // the acknowledgment.
+                // 确认所有已发送消息到此应答的消息ID间的所有已发送消息；
                 boolean inAckRange = false;
                 List<MessageReference> removeList = new ArrayList<MessageReference>();
+                /*
+                * 遍历已发送消息列表，
+                * */
                 for (final MessageReference node : dispatched) {
                     MessageId messageId = node.getMessageId();
+                    // 如果ack的起始messageId为空或者等于当前messageid,麻烦标记该条已发送消息在范围内；
                     if (ack.getFirstMessageId() == null
                             || ack.getFirstMessageId().equals(messageId)) {
                         inAckRange = true;
                     }
+
                     if (inAckRange) {
                         // Don't remove the nodes until we are committed.
                         if (!context.isInTransaction()) {
@@ -230,7 +248,9 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                         } else {
                             registerRemoveSync(context, node);
                         }
+                        // 调用子类中的具体实现过程；
                         acknowledge(context, ack, node);
+                        //如果到达ack标记的最后一个messageid,直接退出循环；
                         if (ack.getLastMessageId().equals(messageId)) {
                             destination = (Destination) node.getRegionDestination();
                             callDispatchMatched = true;
@@ -247,6 +267,7 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                 if (!callDispatchMatched) {
                     LOG.warn("Could not correlate acknowledgment with dispatched message: {}", ack);
                 }
+                // 如果是独立ACK
             } else if (ack.isIndividualAck()) {
                 // Message was delivered and acknowledge - but only delete the
                 // individual message
@@ -636,31 +657,35 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                     int count = 0;
                     pending.reset();
                     while (count < numberToDispatch && !isFull() && pending.hasNext()) {
+                        // 获取一条待发送消息；
                         MessageReference node = pending.next();
                         if (node == null) {
                             break;
                         }
-
                         // Synchronize between dispatched list and remove of message from pending list
                         // related to remove subscription action
+                        // 在已发送列表和从积压列表的消息间进行同步，和移除订阅关系相关；
                         synchronized(dispatchLock) {
                             pending.remove();
+                            //确认消息没有被删除并且没有过期；
                             if (!isDropped(node) && canDispatch(node)) {
-
                                 // Message may have been sitting in the pending
                                 // list a while waiting for the consumer to ak the message.
+                                // 消息不为空且未过期
                                 if (node != QueueMessageReference.NULL_MESSAGE && node.isExpired()) {
                                     //increment number to dispatch
                                     numberToDispatch++;
+                                    //处理过期消息
                                     if (broker.isExpired(node)) {
                                         ((Destination)node.getRegionDestination()).messageExpired(context, this, node);
                                     }
-
+                                    // 跳过浏览器
                                     if (!isBrowser()) {
                                         node.decrementReferenceCount();
                                         continue;
                                     }
                                 }
+                                // 执行发送过程
                                 dispatch(node);
                                 count++;
                             }
@@ -689,15 +714,18 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
     }
 
     // called with dispatchLock held
+    // 向消费者发送出入的消息；
     protected boolean dispatch(final MessageReference node) throws IOException {
+        // 抽取消息实体；
         final Message message = node.getMessage();
         if (message == null) {
             return false;
         }
 
         okForAckAsDispatchDone.countDown();
-
+        // 重新包装成为 MessageDispatch 命令;
         MessageDispatch md = createMessageDispatch(node, message);
+        // 如果不是空消息；
         if (node != QueueMessageReference.NULL_MESSAGE) {
             getSubscriptionStatistics().getDispatched().increment();
             dispatched.add(node);
@@ -712,6 +740,7 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                 }
             }
         }
+        // 采用异步方式发送；
         if (info.isDispatchAsync()) {
             md.setTransmitCallback(new TransmitCallback() {
 
@@ -719,6 +748,7 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
                 public void onSuccess() {
                     // Since the message gets queued up in async dispatch, we don't want to
                     // decrease the reference count until it gets put on the wire.
+
                     onDispatch(node, message);
                 }
 
@@ -739,7 +769,9 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
             });
             context.getConnection().dispatchAsync(md);
         } else {
+            // 调用底层通信器，采用同步方式发送；
             context.getConnection().dispatchSync(md);
+            //处理发送后响应
             onDispatch(node, message);
         }
         return true;
@@ -751,7 +783,7 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
             if (node != QueueMessageReference.NULL_MESSAGE) {
                 nodeDest.getDestinationStatistics().getDispatched().increment();
                 nodeDest.getDestinationStatistics().getInflight().increment();
-                LOG.trace("{} dispatched: {} - {}, dispatched: {}, inflight: {}", new Object[]{ info.getConsumerId(), message.getMessageId(), message.getDestination(), getSubscriptionStatistics().getDispatched().getCount(), dispatched.size() });
+                LOG.info("{} dispatched: {} - {}, dispatched: {}, inflight: {}", new Object[]{ info.getConsumerId(), message.getMessageId(), message.getDestination(), getSubscriptionStatistics().getDispatched().getCount(), dispatched.size() });
             }
         }
 
@@ -803,7 +835,7 @@ public abstract class PrefetchSubscription extends AbstractSubscription {
 
     /**
      * Use when a matched message is about to be dispatched to the client.
-     *
+     * 在消息发送给客户端前调用，确认能否发送；
      * @param node
      * @return false if the message should not be dispatched to the client
      *         (another sub may have already dispatched it for example).
