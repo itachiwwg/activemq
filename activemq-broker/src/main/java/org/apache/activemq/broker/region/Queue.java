@@ -81,7 +81,7 @@ import org.apache.activemq.command.Response;
 import org.apache.activemq.filter.BooleanExpression;
 import org.apache.activemq.filter.MessageEvaluationContext;
 import org.apache.activemq.filter.NonCachedMessageEvaluationContext;
-import org.apache.activemq.selector.SelectorParser;
+//import org.apache.activemq.selector.SelectorParser;
 import org.apache.activemq.state.ProducerState;
 import org.apache.activemq.store.IndexListener;
 import org.apache.activemq.store.ListenableFuture;
@@ -609,6 +609,8 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
     }
 
     private volatile ResourceAllocationException sendMemAllocationException = null;
+
+    // 将传入的消息对象 发送至 store 进行持久化，然后给生产者发送 ack；
     @Override
     public void send(final ProducerBrokerExchange producerExchange, final Message message) throws Exception {
         final ConnectionContext context = producerExchange.getConnectionContext();
@@ -1788,7 +1790,7 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
             };
         }
 
-        final BooleanExpression selectorExpression = SelectorParser.parse(selector);
+        //final BooleanExpression selectorExpression = SelectorParser.parse(selector);
 
         return new MessageReferenceFilter() {
             @Override
@@ -1799,8 +1801,8 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
                 if (messageEvaluationContext.getDestination() == null) {
                     messageEvaluationContext.setDestination(getActiveMQDestination());
                 }
-
-                return selectorExpression.matches(messageEvaluationContext);
+                return false;//wwg
+                //return selectorExpression.matches(messageEvaluationContext);
             }
         };
     }
