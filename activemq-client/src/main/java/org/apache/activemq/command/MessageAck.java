@@ -32,6 +32,10 @@ public class MessageAck extends BaseCommand {
      * This is used get the broker to send more messages past prefetch limits
      * when an standard ack has not been sent.
      */
+    /**
+     * 本参数用来表明消息已经投递给客户端，消息仍旧需要保持直到收到标准ACK；
+     * 当标准ACK未被发送时，这个类型的消息可以让broker发送超越prefetch限制的更多消息；
+     */
     public static final byte DELIVERED_ACK_TYPE = 0;
 
     /**
