@@ -456,7 +456,7 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
             wakeup();
         }
     }
-
+    // 删除与本队列相关的订阅关系
     @Override
     public void removeSubscription(ConnectionContext context, Subscription sub, long lastDeliveredSequenceId)
             throws Exception {
@@ -831,7 +831,11 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
             messageContext.message.decrementReferenceCount();
         }
     }
-
+    /**
+     * direction : Queue -> store, Cursor Add;
+     *
+     *
+     */
     void doMessageSend(final ProducerBrokerExchange producerExchange, final Message message) throws IOException,
             Exception {
         final ConnectionContext context = producerExchange.getConnectionContext();
@@ -938,6 +942,7 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
     public void gc() {
     }
 
+    // 从持久化层中移除消息；
     @Override
     public void acknowledge(ConnectionContext context, Subscription sub, MessageAck ack, MessageReference node)
             throws IOException {
@@ -981,6 +986,9 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
     @Override
     public void start() throws Exception {
         if (started.compareAndSet(false, true)) {
+            /**
+            * start
+            */
             if (memoryUsage != null) {
                 memoryUsage.start();
             }
@@ -1793,6 +1801,7 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
         removeMessage(c, subs, r, ack);
     }
 
+
     protected void removeMessage(ConnectionContext context, Subscription sub, final QueueMessageReference reference,
             MessageAck ack) throws IOException {
         LOG.trace("ack of {} with {}", reference.getMessageId(), ack);
@@ -2238,6 +2247,8 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
         doDispatch(doPageInForDispatch(force, true, maxPageSize));
     }
 
+
+    // 将目标订阅关系添加到本队列消费者列表；
     private void addToConsumerList(Subscription sub) {
         if (useConsumerPriority) {
             consumers.add(sub);
